@@ -1,87 +1,57 @@
 #include <FastLED.h>
 
-#define NUMLEDS 15
-#define LEDPIN 23
+#define LED_TYPE WS2812B
 
-#define NUMCOLS 2
-#define LEDSPERCOL 7
+#define LEDPIN0 17
+#define LEDPIN1 16
+#define LEDPIN2 19
+#define LEDPIN3 18
+#define LEDPIN4 5
 
-#define GREEN CHSV(100, 255, 255)
+#define NUMCOLS 5
+#define LEDSPERCOL 5
+
+#define TOTALLEDS (NUMCOLS * LEDSPERCOL)
+
+#define BRIGHTNESS 64
+
+#define FRAMEDELAY 100
+
+#define GREEN CHSV(96, 255, 255)
 #define BLACK CRGB(0, 0, 0)
 
 extern const uint8_t gammaVals[];
 
-CRGB leds[NUMLEDS];
-
-uint8_t curStep = 0;
+CRGB leds[TOTALLEDS];
 
 uint8_t lengths[NUMCOLS];
 
 void setup() {
-    Serial.begin(115200);
-
-    FastLED.addLeds<NEOPIXEL, LEDPIN>(leds, NUMLEDS);
+    // add each strip into leds array
+    FastLED.addLeds<LED_TYPE, LEDPIN0, GRB>(leds, LEDSPERCOL);
+    FastLED.addLeds<LED_TYPE, LEDPIN1, GRB>(leds, LEDSPERCOL, LEDSPERCOL);
+    FastLED.addLeds<LED_TYPE, LEDPIN2, GRB>(leds, LEDSPERCOL * 2, LEDSPERCOL);
+    FastLED.addLeds<LED_TYPE, LEDPIN3, GRB>(leds, LEDSPERCOL * 3, LEDSPERCOL);
+    FastLED.addLeds<LED_TYPE, LEDPIN4, GRB>(leds, LEDSPERCOL * 4, LEDSPERCOL);
 
     FastLED.setDither(0);
 
-    FastLED.setBrightness(pgm_read_byte(&gammaVals[127]));
+    FastLED.setBrightness(pgm_read_byte(&gammaVals[BRIGHTNESS]));
 
     random16_add_entropy(analogRead(A0));
 
     // generate random length for each col
     for (uint8_t i = 0; i < NUMCOLS; i++) {
-        lengths[i] = random8(2, 5);
+        lengths[i] = getRandomLength();
     }
 }
 
 void loop() {
-
-    // uint8_t head = 0;
-
-    // while (head < 4) {
-    //     fill_solid(&(leds[0]), NUMLEDS, CRGB(0, 0, 0));
-    //     leds[head] = GREEN;
-    //     FastLED.delay(300);
-    //     head++;
-    // }
-
-    // nextStep();
-    // update();
-    // FastLED.delay(5);
-
-    // fill_solid(leds, NUMLEDS, BLACK);
-    // // leds[14] = GREEN;
-    // FastLED.show();
-    // FastLED.delay(100);
-
-    // uint8_t length = 4;
-
-    // while (length > 0) {
-    //     shiftSection(leds, NUMLEDS, GREEN);
-    //     FastLED.show();
-    //     FastLED.delay(100);
-    //     length--;
-    // }
-
-    // for (int i = 0; i < NUMLEDS; i++) {
-    //     shiftSection(leds, NUMLEDS);
-    //     FastLED.show();
-    //     delay(100);
-    // }
-
     shiftAll();
     refreshLengths();
 
     FastLED.show();
-    FastLED.delay(100);
-
-    // while (!areAllPixelsOff()) {
-    //     shiftAll();
-    //     refreshLengths();
-
-    //     FastLED.show();
-    //     FastLED.delay(100);
-    // }
+    FastLED.delay(FRAMEDELAY);
 }
 
 void shiftAll() {
@@ -100,108 +70,25 @@ void refreshLengths() {
         if (lengths[i] == 0 && areAllPixelsInSectionOff(&leds[LEDSPERCOL * i], LEDSPERCOL)) {
             uint8_t random = random8();
             if (random < 128) {
-                lengths[i] = random8(2, 5);
+                lengths[i] = getRandomLength();
             }
         }
     }
 }
 
-uint8_t areAllPixelsInSectionOff(CRGB *ledsP, uint8_t numLeds) {
-    uint8_t allOff = true;
-    for (uint8_t i = 0; i < numLeds; i++) {
-        if (*(ledsP + i)) {
-            allOff = false;
-        }
-    }
-    return allOff;
-}
-
-uint8_t areAllPixelsOff() {
-    uint8_t allOff = true;
-    for (uint8_t i = 0; i < NUMLEDS; i++) {
-        if (leds[i]) {
-            allOff = false;
-        }
-    }
-    return allOff;
-}
-
-void nextStep() {
-    // for (uint8_t i = 0; i < NUMCOLS; i++) {
-    //     if (heads[i] < LEDSPERCOL) {
-    //         heads[i]++;
-    //     } else {
-    //         uint8_t random = random8();
-    //         if (random < 127) {
-    //             heads[i] = 0;
-    //         }
-    //     }
-    // }
-
-    // for (uint8_t led = 0; led < NUMLEDS; led++) {
-    //     uint16_t offset = map(led, 0, NUMLEDS, 0, 255);
-    //     uint8_t ledOffset = offset + curStep;
-    //     if (ledOffset > 127) {
-    //         uint8_t val = cubicwave8(ledOffset);
-    //         leds[led] = CHSV(100, 255, pgm_read_byte(&gammaVals[val]));
-    //     } else {
-    //         leds[led] = BLACK;
-    //     }
-    // }
-
-    waveUpdateSection(leds, 5);
-
-    FastLED.show();
-
-    curStep++;
-}
-
-void waveUpdateSection(CRGB *ledsP, uint8_t numLeds) {
-    for (uint8_t led = 0; led < numLeds; led++) {
-        uint8_t ledOffset = map(led, 0, numLeds, 0, 255) + curStep;
-        if (ledOffset > 127) {
-            uint8_t val = cubicwave8(ledOffset);
-            *(ledsP + led) = CHSV(100, 255, pgm_read_byte(&gammaVals[val]));
-        } else {
-            *(ledsP + led) = BLACK;
-        }
-    }
+uint8_t getRandomLength() {
+    return random8(2, 6);
 }
 
 void shiftSection(CRGB *ledsP, uint8_t numLeds, CRGB underflowColor) {
-    for (uint8_t led = 0; led < numLeds - 1; led++) {
-        *(ledsP + led) = *(ledsP + led + 1);
+    for (uint8_t led = numLeds - 1; led > 0; led--) {
+        *(ledsP + led) = *(ledsP + led - 1);
     }
-    *(ledsP + numLeds - 1) = underflowColor;
+    *(ledsP) = underflowColor;
 }
-
-// void shiftSection(CRGB *ledsP, uint8_t numLeds, CHSV underflowColor) {
-//     for (uint8_t led = 0; led < numLeds - 1; led++) {
-//         *(ledsP + led) = *(ledsP + led + 1);
-//     }
-//     *(ledsP + numLeds - 1) = underflowColor;
-// }
 
 void shiftSection(CRGB *ledsP, uint8_t numLeds) {
     shiftSection(ledsP, numLeds, BLACK);
-}
-
-void update() {
-    // fill_solid(&(leds[0]), NUMLEDS, CRGB(0, 0, 0));
-    // for (uint8_t i = 0; i < NUMCOLS; i++) {
-    //     if (heads[i] < LEDSPERCOL + 2) {
-    //         uint8_t headLed = LEDSPERCOL * i + heads[i];
-    //         leds[headLed] = GREEN;
-    //         if (heads[i] > 0) {
-    //             leds[headLed - 1] = GREEN;
-    //             leds[headLed - 1] %= pgm_read_byte(&gammaVals[172]);
-    //         }
-    //         if (heads[i] > 1) {
-    //             leds[headLed - 2] = GREEN;
-    //             leds[headLed - 2] %= pgm_read_byte(&gammaVals[64]);
-    //         }
-    //     }
-    // }
 }
 
 const PROGMEM uint8_t gammaVals[] = {
